@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>SENTRY — Loading…</title>
+<style>
+  body {
+    background: #0b0d12;
+    color: #8a93a6;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    margin: 0;
+    font-size: 14px;
+    letter-spacing: 0.3px;
+  }
+</style>
+</head>
+<body>
+<div id="msg">Loading your data…</div>
+<script>
+  /*
+    SENTRY boot page — Phase 2.
+    Job: pull every saved key out of SQLite (via Python) and write it into
+    real browser localStorage BEFORE the actual dashboard (index.html)
+    loads. Once that's done, hand off to index.html, which then reads
+    localStorage exactly as it always has — no changes needed there
+    beyond the small persistence patch at the top of its <head>.
+  */
+  function showError(text) {
+    document.getElementById("msg").textContent = text;
+  }
+
+  function hydrateAndGo() {
+    window.pywebview.api.storage_get_all()
+      .then(function (data) {
+        Object.keys(data).forEach(function (key) {
+          try {
+            localStorage.setItem(key, data[key]);
+          } catch (e) {
+            console.error("[SENTRY boot] could not hydrate key", key, e);
+          }
+        });
+        window.location.replace("index.html");
+      })
+      .catch(function (err) {
+        console.error("[SENTRY boot] hydration failed, opening with local data only:", err);
+        window.location.replace("index.html");
+      });
+  }
+
+  if (window.pywebview && window.pywebview.api) {
+    hydrateAndGo();
+  } else {
+    window.addEventListener("pywebviewready", hydrateAndGo);
+    // Safety net: if the bridge never signals ready within 5 seconds,
+    // open the dashboard anyway rather than leaving Rajesh stuck on
+    // a blank loading screen.
+    setTimeout(function () {
+      showError("Still loading — opening dashboard…");
+      hydrateAndGo();
+    }, 5000);
+  }
+</script>
+</body>
+</html>
