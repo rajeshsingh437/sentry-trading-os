@@ -2,6 +2,53 @@
 
 <html lang="en">
 <head>
+<script>
+/*
+  SENTRY persistence bridge — Phase 2.
+  This runs before any of the dashboard's own logic below. It does not
+  change how the app reads/writes localStorage (still synchronous, still
+  works exactly the same) — it only adds a second, durable copy of every
+  write into the local SQLite database via Python, so data survives an
+  app restart or a move to a new laptop (localStorage alone would not).
+  See PROJECT_MASTER.md Section 3.1 architecture note if this needs
+  changing later.
+*/
+(function () {
+  var originalSetItem = localStorage.setItem.bind(localStorage);
+  var originalRemoveItem = localStorage.removeItem.bind(localStorage);
+
+  function relaySet(key, value) {
+    if (window.pywebview && window.pywebview.api) {
+      window.pywebview.api.storage_set_item(key, value).catch(function (e) {
+        console.error("[SENTRY persistence] failed to save", key, e);
+      });
+    } else {
+      window.addEventListener("pywebviewready", function once() {
+        window.removeEventListener("pywebviewready", once);
+        window.pywebview.api.storage_set_item(key, value).catch(function (e) {
+          console.error("[SENTRY persistence] failed to save", key, e);
+        });
+      });
+    }
+  }
+
+  function relayRemove(key) {
+    if (window.pywebview && window.pywebview.api) {
+      window.pywebview.api.storage_remove_item(key).catch(function () {});
+    }
+  }
+
+  localStorage.setItem = function (key, value) {
+    originalSetItem(key, value);
+    relaySet(key, value);
+  };
+
+  localStorage.removeItem = function (key) {
+    originalRemoveItem(key);
+    relayRemove(key);
+  };
+})();
+</script>
 <meta charset="utf-8"/>
 <title>TOS · Trading Operating System</title>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
@@ -333,6 +380,7 @@
   .badge.warn{background:var(--amber-dim); color:var(--amber);}
   .badge.stop{background:var(--red-dim); color:var(--red);}
   .badge.ok{background:var(--green-dim); color:var(--green);}
+  .badge.violation{background:var(--red); color:#fff;}
   .alert p{color:var(--text-dim); line-height:1.4;}
   .alert p b{color:var(--text); font-weight:500;}
 
@@ -829,8 +877,9 @@ animation:fadeout 2.2s forwards;
 <div class="form-grid" style="grid-template-columns:repeat(3,1fr);">
 <div class="field"><label>Planned Stop ₹</label><input id="pStop" placeholder="105" step="0.5" type="number"/></div>
 <div class="field"><label>Planned Target ₹ <span style="text-transform:none; font-weight:400; color:var(--text-faint);">final leg, if scaling out</span></label><input id="pTarget" placeholder="225" step="0.5" type="number"/></div>
-<div class="field"><label>&nbsp;</label></div>
+<div class="field"><label>Qty (lots) <span style="text-transform:none; font-weight:400; color:var(--text-faint);">for the risk % check below</span></label><input id="pQty" placeholder="1" step="1" type="number"/></div>
 </div>
+<div id="planRiskWarning" style="margin-bottom:14px;"></div>
 <div class="field" style="margin-bottom:14px;">
 <label>Planned Exits (Scale-Out) <span style="text-transform:none; font-weight:400; color:var(--text-faint);">optional — for a single-exit plan, just use Planned Target above</span></label>
 <div class="form-grid" style="grid-template-columns:repeat(3,1fr); margin-bottom:0;">
@@ -944,6 +993,7 @@ animation:fadeout 2.2s forwards;
 <div class="field"><label>Qty (lots)</label><input id="jQty" placeholder="1" step="1" type="number"/></div>
 <div class="field"><label>Risk ₹ (total) <span style="text-transform:none; font-weight:400; color:var(--text-faint);">auto, editable</span></label><input id="jRisk" placeholder="2600" step="1" type="number"/></div>
 </div>
+<div id="journalRiskWarning" style="margin-bottom:14px;"></div>
 <div class="field" style="margin-bottom:14px;">
 <label>Partial Exits (Scale-Out) <span style="text-transform:none; font-weight:400; color:var(--text-faint);">optional — leave blank for a single exit</span></label>
 <div class="form-grid" style="grid-template-columns:repeat(6,1fr); margin-bottom:0;">
@@ -4329,10 +4379,11 @@ animation:fadeout 2.2s forwards;
     }catch(e){ /* ignore corrupt storage */ }
   }
   function clearPlanForm(){
-    ['pStrike','pStrategy','pSetup','pEntry','pStop','pTarget','pExit1','pExit2','pExit3','pThesis','pPremortem'].forEach(id=>{ $('#'+id).value=''; });
+    ['pStrike','pStrategy','pSetup','pEntry','pStop','pTarget','pQty','pExit1','pExit2','pExit3','pThesis','pPremortem'].forEach(id=>{ $('#'+id).value=''; });
     $('#pType').value = 'CE';
     $('#pInstrument').value = 'NIFTY';
     state.formPlanConfidence = 3; renderPlanConfidenceStars();
+    $('#planRiskWarning').innerHTML = '';
   }
   function renderPlanList(){
     const openPlans = state.tradePlans.filter(p=>p.status==='open');
@@ -4341,7 +4392,7 @@ animation:fadeout 2.2s forwards;
       <div class="breakdown-row" style="grid-template-columns:1fr auto; align-items:flex-start;">
         <div class="breakdown-label" style="gap:4px;">
           <span>${p.instrument||'NIFTY'} ${p.strike} ${p.type} · ${p.strategy}</span>
-          <span class="breakdown-meta">₹${p.entry} → SL ₹${p.stop} / T ₹${p.target} · confidence ${p.confidence}★${(p.exit1||p.exit2||p.exit3) ? ` · scale-out: ${[p.exit1,p.exit2,p.exit3].filter(Boolean).map(x=>'₹'+x).join(' / ')}` : ''}</span>
+          <span class="breakdown-meta">Qty ${p.qty||1} lot(s) · ₹${p.entry} → SL ₹${p.stop} / T ₹${p.target} · confidence ${p.confidence}★${(p.exit1||p.exit2||p.exit3) ? ` · scale-out: ${[p.exit1,p.exit2,p.exit3].filter(Boolean).map(x=>'₹'+x).join(' / ')}` : ''}</span>
           <span class="breakdown-meta" style="white-space:normal; color:var(--text-dim);">${p.thesis || '—'}</span>
         </div>
         <div style="display:flex; gap:6px;">
@@ -4393,6 +4444,7 @@ animation:fadeout 2.2s forwards;
       entry: Number($('#pEntry').value)||0,
       stop: Number($('#pStop').value)||0,
       target: Number($('#pTarget').value)||0,
+      qty: Number($('#pQty').value)||1,
       exit1: $('#pExit1').value===''?null:Number($('#pExit1').value),
       exit2: $('#pExit2').value===''?null:Number($('#pExit2').value),
       exit3: $('#pExit3').value===''?null:Number($('#pExit3').value),
@@ -4417,11 +4469,13 @@ animation:fadeout 2.2s forwards;
     $('#jStrike').value = plan.strike; $('#jType').value = plan.type;
     $('#jStrategy').value = plan.strategy; $('#jSetup').value = plan.setup;
     $('#jEntry').value = plan.entry; $('#jStop').value = plan.stop; $('#jTarget').value = plan.target;
+    if(plan.qty) $('#jQty').value = plan.qty;
     if(plan.exit1!=null) $('#jExit1Price').value = plan.exit1;
     if(plan.exit2!=null) $('#jExit2Price').value = plan.exit2;
     if(plan.exit3!=null) $('#jExit3Price').value = plan.exit3;
     state.formConfidence = plan.confidence; renderConfidenceStars();
     autoCalcJournalRisk();
+    renderJournalRiskWarning();
   }
   $('#planLoader').addEventListener('change', e=>{
     const id = e.target.value ? Number(e.target.value) : null;
@@ -4513,14 +4567,22 @@ animation:fadeout 2.2s forwards;
     $('#jQty').value = 1;
     state.formConfidence = 3; renderConfidenceStars();
     state.formScreenshot = null; renderScreenshotPreview();
+    $('#journalRiskWarning').innerHTML = '';
   }
   function todayISO(){ return new Date().toISOString().slice(0,10); }
 
   // ---------------- Auto-calc Risk ₹ and P/L ₹ from Entry/Stop/Exit/Qty ----------------
-  function journalLotSize(){
-    const inst = $('#jInstrument') ? $('#jInstrument').value : 'NIFTY';
+  function lotSizeForInstrument(inst){
     if(INSTRUMENT_LOT_SIZES[inst]) return INSTRUMENT_LOT_SIZES[inst];
     return Number($('#lotSize') ? $('#lotSize').value : 65) || 65;
+  }
+  function journalLotSize(){
+    const inst = $('#jInstrument') ? $('#jInstrument').value : 'NIFTY';
+    return lotSizeForInstrument(inst);
+  }
+  function planLotSize(){
+    const inst = $('#pInstrument') ? $('#pInstrument').value : 'NIFTY';
+    return lotSizeForInstrument(inst);
   }
   function autoCalcJournalRisk(){
     const entry = Number($('#jEntry').value)||0;
@@ -4529,6 +4591,54 @@ animation:fadeout 2.2s forwards;
     if(!entry && !stop) return;
     const risk = Math.round(Math.abs(entry-stop) * qty * journalLotSize());
     $('#jRisk').value = risk || '';
+  }
+  // ---------------- Live risk % warning (Journal + Trade Plan) ----------------
+  // Thresholds: <2% normal · 2-3% warning · 3-4% flagged · 4-5% high risk · 5%+ violation
+  function renderRiskBanner(elId, entry, stop, qty, lotSize, acc){
+    const el = $('#'+elId);
+    if(!el) return;
+    if(!entry || !stop || !qty || !acc){ el.innerHTML=''; return; }
+    const riskRupees = Math.abs(entry-stop) * qty * lotSize;
+    const riskPct = acc>0 ? (riskRupees/acc*100) : 0;
+    const riskFmt = `₹${Math.round(riskRupees).toLocaleString()} — ${riskPct.toFixed(2)}% of account`;
+    let badge, label, message;
+    if(riskPct < 2){
+      badge='ok'; label='OK';
+      message = `${riskFmt}. Within normal risk range.`;
+    } else if(riskPct < 3){
+      badge='warn'; label='WARNING';
+      message = `${riskFmt}. Approaching your risk limit — review sizing before entering.`;
+    } else if(riskPct < 4){
+      badge='stop'; label='FLAGGED';
+      message = `${riskFmt}. Elevated risk — reconsider position size.`;
+    } else if(riskPct < 5){
+      badge='stop'; label='HIGH RISK';
+      message = `${riskFmt}. Sizing is aggressive — scaling down is strongly advised.`;
+    } else {
+      badge='violation'; label='VIOLATION';
+      message = `${riskFmt}. Risk limit violation — you need to scale down before taking this trade.`;
+    }
+    el.innerHTML = `<div class="alert"><span class="badge ${badge}">${label}</span><p>${message}</p></div>`;
+  }
+  function renderJournalRiskWarning(){
+    renderRiskBanner(
+      'journalRiskWarning',
+      Number($('#jEntry').value)||0,
+      Number($('#jStop').value)||0,
+      Number($('#jQty').value)||0,
+      journalLotSize(),
+      Number($('#accSize') ? $('#accSize').value : 0)||0
+    );
+  }
+  function renderPlanRiskWarning(){
+    renderRiskBanner(
+      'planRiskWarning',
+      Number($('#pEntry').value)||0,
+      Number($('#pStop').value)||0,
+      Number($('#pQty').value)||0,
+      planLotSize(),
+      Number($('#accSize') ? $('#accSize').value : 0)||0
+    );
   }
   function getScaleOutLegs(){
     const legs = [
@@ -4567,7 +4677,21 @@ animation:fadeout 2.2s forwards;
   }
   ['jEntry','jStop','jQty'].forEach(id=>{
     $('#'+id).addEventListener('input', autoCalcJournalRisk);
+    $('#'+id).addEventListener('input', renderJournalRiskWarning);
   });
+  if($('#jInstrument')){
+    $('#jInstrument').addEventListener('change', renderJournalRiskWarning);
+  }
+  if($('#accSize')){
+    $('#accSize').addEventListener('input', renderJournalRiskWarning);
+    $('#accSize').addEventListener('input', renderPlanRiskWarning);
+  }
+  ['pEntry','pStop','pQty'].forEach(id=>{
+    if($('#'+id)) $('#'+id).addEventListener('input', renderPlanRiskWarning);
+  });
+  if($('#pInstrument')){
+    $('#pInstrument').addEventListener('change', renderPlanRiskWarning);
+  }
   ['jEntry','jExit','jQty','jExit1Price','jExit1Qty','jExit2Price','jExit2Qty','jExit3Price','jExit3Qty'].forEach(id=>{
     $('#'+id).addEventListener('input', recomputeExitAndPnl);
   });
@@ -4589,6 +4713,7 @@ animation:fadeout 2.2s forwards;
     state.formConfidence = t.confidence || 3; renderConfidenceStars();
     state.formScreenshot = t.screenshot || null; renderScreenshotPreview();
     recomputeExitAndPnl({preserveManualIfNoLegs:true});
+    renderJournalRiskWarning();
     $('#journalFormTitle').textContent = 'Edit Trade #' + (idx+1);
     $('#addTradeBtn').textContent = 'Save changes';
     $('#cancelEditBtn').style.display = 'inline-block';
