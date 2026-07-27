@@ -43,6 +43,11 @@ class Api:
         storage.remove_item(key)
         return True
 
+    def get_trade_stats(self):
+        """Structured-table stats (Layer B) — available for future
+        phases (Analytics) to call directly instead of parsing JSON."""
+        return storage.get_trade_stats()
+
 
 if __name__ == "__main__":
     # Make sure the database file/table exist before the window opens.
