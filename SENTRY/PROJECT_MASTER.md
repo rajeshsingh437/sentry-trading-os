@@ -18,6 +18,7 @@
 8. Update the Work Log (Section 10) before ending the session, so the next AI/session can continue with zero re-explaining.
 9. **Prefer command-line/terminal instructions over manual UI steps**, wherever a command-line equivalent exists — creating files, creating folders, editing config, git operations, installing packages/extensions, all go through the terminal. Reserve click-through UI steps only for actions with no CLI equivalent (e.g. installing VS Code/Python itself the first time, or GitHub website actions like creating a new empty repo).
 10. **Every file's content is delivered as a single complete, copy-paste-ready code block** — never described in prose, never inline mid-sentence, and never as a partial diff.
+11. **Any new feature idea gets weighed against the long-term goal before being built** — briefly state what it costs (build time, complexity, risk to existing logic) versus what it adds toward disciplined, risk-adjusted compounding, then keep or discard. Section 13 is a large backlog by design — it is not a queue to build in one pass; each item gets this evaluation when its turn comes up.
 
 ---
 
@@ -36,6 +37,7 @@ Core operating principles (carried over from TOS v1/v2, do not dilute):
 - **Process Over Result** — the plan and its execution are graded independently of P&L.
 - **Detach From Single Trades** — no single trade should be able to meaningfully hurt the account or the trader's head.
 - **Focus on Horizons** — risk-adjusted compounding over years, not days.
+- **Zoom Out On Every Slip** — any mistake, tilt, or bad session gets reframed on a *minimum weekly* basis, not a single-trade basis. One trade never carries the weight of the whole story — survival and process do. This applies to how the app talks to Rajesh, and how any AI session talks to him too.
 
 ---
 
@@ -133,6 +135,8 @@ git push
 - A background script checks an isolated inbox for Flattrade's official trade-execution alert emails and updates the journal near-real-time without manual work.
 
 **Build order:** Tier 2 (CSV/contract-note parser) is actually the fastest to get *something* real flowing into the journal in week 1, even before the live API polling is fully wired — recommend building Tier 2 first as the reliability floor, then layering Tier 1 on top. Flag this as a sequencing improvement over the doc's stated order.
+
+**Open tension, needs Rajesh's call when we get there (see Section 13.13):** his later notes say "auto broker integration at the last stage," which could mean either (a) push *all* of Section 4 to the end of the whole build, or (b) push only the more automated pieces (multi-broker support, 2FA cloning, terminal auto-execution) to the end, while local read-only access to the trade/order book — which is what the impulse-trade detector in Tier 1 actually needs — stays early since that's the core discipline guardrail the whole project started from. Don't resolve this unilaterally; ask Rajesh directly before Phase 4/5 (Tier 1/2 build) starts.
 
 ---
 
@@ -241,6 +245,12 @@ A short "how to move to a new laptop" note (copy folder, run exe, data comes wit
 
 > Format: Date · What was done · What's next · Anything flagged
 
+- **[Insert Date]** · **SM and PA exit confirmed by Rajesh directly** — SM = Social Media (distraction tag, ties into 13.9); PA exit = exit based on market structure (support/resistance zone or opposite-side signal), not a fixed target. Added both to `TAGS_GLOSSARY.md`, updated Section 13.16 to reflect the glossary is now fully resolved. The one remaining unnamed concept is the "jumping back into a trade after a break" leak point (13.6) — not a term Rajesh has given a tag for yet, separate from the glossary being complete. **No app code changes this session.** **Next:** Rajesh's call — tag system (13.2) can now be built against a fully-defined glossary, or continue the phase roadmap (Phase 4). · **Flagged (carried over):** parallel React/TS repo should be paused/archived; free market-data source for VIX/USD-INR/Crude not yet chosen (Section 7); PyInstaller SmartScreen warning expected at Phase 11, not a bug; broker-integration sequencing tension (Section 4) still needs a direct conversation.
+
+- **[Insert Date]** · **Received and filed `TAG.txt` — the shorthand/tag glossary.** Created `TAGS_GLOSSARY.md` (new file, project root) as the canonical source for every setup name, grade, probability, context, type-of-day term, and gap-type term, plus six numbered behavioral/session rules. Updated `PROJECT_MASTER.md` to point at it: Section 13.16 now marks most terms resolved (only **SM** and **PA exit** remain genuinely unconfirmed); Section 13.1 gained the concrete hourly session-check cadence (10:15–14:15) and the post-14:15/TTR-flag specifics; Section 13.6 gained the real trading-window rule (no trades past 2:30 PM off a trend day) and the actual A+ setup list. **Corrected a mistake from the previous session:** Section 13.6 had guessed "LPT" was the tag for jumping back into a trade after a break — the glossary shows LPT actually means "Low-Probability Trade," unrelated. Fixed the text to say that specific leak point is still unnamed rather than leave the wrong guess in place. **No app code changes this session** — glossary filing only. **Next:** Rajesh's call — could start building the tag system (13.2) against the now-defined setup/context tags, or continue the phase roadmap (Phase 4). SM and PA exit still need confirming before any logic depends on them. · **Flagged (carried over):** parallel React/TS repo should be paused/archived; free market-data source for VIX/USD-INR/Crude not yet chosen (Section 7); PyInstaller SmartScreen warning expected at Phase 11, not a bug; broker-integration sequencing tension (Section 4) still needs a direct conversation.
+
+- **[Insert Date]** · **Qty/risk-warning bug from previous session confirmed fixed** — was a stale `index.html` not fully replaced on Rajesh's machine, not a code issue; resolved by re-unzipping the full package. **Received and organized `TOS.docx`** — a large personal brain-dump of feature requirements — into new **Section 13: Behavioral Coaching & Real-Time Feedback Engine — Feature Backlog** (16 subsections: daily rhythm prompts, real-time tagging, risk-of-ruin/drawdown simulation, multi-leg scale-out automation, position sizing suggestions, setup discipline loop, streak detection, event/expiry awareness, distraction tracking, idea inbox, Amibroker screenshot integration, auto charges/taxes, broker roadmap refinement, English-writing coaching layer, a testing-phase data reset utility, and a glossary of undefined trading-jargon terms). Also added: a new governance rule (Section 0, Rule 11 — every new feature gets weighed against the long-term goal before being built, not built just because it's listed) and a new philosophy principle (Section 1 — "Zoom Out On Every Slip," reframing any mistake on a weekly basis, not a single-trade basis, sourced directly from Rajesh's own notes). Flagged rather than resolved: (1) several trading-jargon terms (SM, FOL, PA exit, TTR, NTD, SOH, LPT, BO-1Pb) are used in the source notes without definitions — listed in Section 13.16, need Rajesh's own definitions before logic can be built against them; (2) a real tension between Section 4's current broker build order and a new note saying "auto broker integration at the last stage" — flagged in Section 4, not resolved unilaterally, needs a direct conversation before Phase 4/5. **No code changes this session** — purely documentation/planning, per Rajesh's explicit request to organize and commit before building anything from this list. **Next:** Rajesh reviews Section 13, decides what (if anything) to prioritize next — could be a small piece (e.g. tag system for FOL/SM once defined) or continuing the existing phase roadmap (Phase 4 broker integration). · **Flagged (carried over):** parallel React/TS repo should be paused/archived; free market-data source for VIX/USD-INR/Crude not yet chosen (Section 7); PyInstaller SmartScreen warning expected at Phase 11, not a bug.
+
 - **[Insert Date]** · **Extended the risk % warning to Trade Plan Capture.** Added a Qty (lots) field to the Trade Plan form (it didn't have one before), and the same live risk banner now appears there too — identical thresholds and colours as the Journal, so a plan gets flagged *before* the trade is even taken, not just after. Refactored the risk-banner logic into one shared function (`renderRiskBanner`) used by both forms, so the two can never drift out of sync. Plan's `qty` is now saved with the plan and carried through automatically when "Send to Journal" is used (the Journal's Qty field and risk banner both populate from the plan). Open Plans list now also shows Qty. Removed a leftover duplicate `journalLotSize()` function from the previous edit in the same session. Verified with `node --check` — no syntax errors — before handoff. · **Flagged (carried over):** parallel React/TS repo should be paused/archived; free market-data source for VIX/USD-INR/Crude not yet chosen (Section 7); PyInstaller SmartScreen warning expected at Phase 11, not a bug.
 
 - **[Insert Date]** · **Phase 3 built: structured trades table.** Extended `storage.py` with a `trades` SQL table (real columns: date, instrument, strike, entry/exit/stop/target, pnl, r_multiple, result, confidence, emotion, tags, etc.) that auto-rebuilds every time the journal (`tos_journal_trades_v2`) is saved — hooked directly into the existing `set_item`/`remove_item` functions from Phase 2, so no dashboard HTML/JS changes were needed at all. Added `get_trade_stats()` (win rate, expectancy, profit factor, avg R) and exposed it as `Api.get_trade_stats()` in `main.py`, ready for Analytics to call directly in a later phase instead of parsing JSON. Verified end-to-end in a standalone test before handoff (two sample trades in → both `kv_store` and `trades` table populated correctly, stats computed correctly: 50% win rate, +0.42R expectancy, 2.67 profit factor). **Also confirmed:** because the journal was already one of the Phase 2 mirrored keys, real trades logged through the existing "Log a Trade" form were *already* durably saved and *already* feeding the Home Dashboard KPI cards before this phase started — Phase 3 only added the structured-table layer underneath, nothing user-facing changed. **Verified working by Rajesh:** logged 6 real trades, dashboard and journal table both reflecting them correctly. · **Flagged (carried over):** parallel React/TS repo should be paused/archived; free market-data source for VIX/USD-INR/Crude not yet chosen (Section 7); PyInstaller SmartScreen warning expected at Phase 11, not a bug.
@@ -278,3 +288,100 @@ git push -u origin main
 - `TLE_Trade_Object_and_Lifecycle_Specification_v1_1.md` is FROZEN. No additions, deletions, or redesign during implementation.
 - This `PROJECT_MASTER.md` file, by contrast, is a **living document** — update the Work Log and any decision sections every session so the philosophy and status stay current for whichever AI opens it next.
 - Any proposed change to the Trade Object spec goes into a separate `PROPOSED_CHANGES_v1.2.md`, discussed only after the current implementation milestone is complete.
+
+---
+
+## 13. Behavioral Coaching & Real-Time Feedback Engine — Feature Backlog
+
+Added from Rajesh's own notes (`TOS.docx`), organized into groups below. **This is a backlog, not a build queue** — see Section 0, Rule 11. Each item gets weighed against the long-term goal when its turn comes up, not built just because it's listed. Sequencing/prioritization is Rajesh's call; this section exists so nothing he asked for gets lost or half-remembered across sessions.
+
+A general design thread running through nearly all of this: **the app should behave like an active coach, not a passive logbook** — asking questions at the right moments (pre-market, hourly, post-market), catching slips in real time via tags, and always re-anchoring back to the weekly/long-term picture rather than any single trade (see Section 1's new "Zoom Out On Every Slip" principle).
+
+### 13.1 Daily Rhythm — Pre-Market / Hourly / Post-Market
+- Opening the app in the morning should prompt a pre-market checklist and produce a score (this already exists in `view-home`'s Pre-Market Regime panel — extend it to *require* completion each morning rather than sit passively).
+- Hourly check-in should ask a short set of questions and, if a slip pattern is detected, remind of the relevant pitfall. **Concrete cadence, per `TAGS_GLOSSARY.md` Rule 5:** every hour, starting at 10:15, through 14:15.
+- **Post-14:15 (last hour), per Rule 2:** the check-in must specifically ask whether the read is resumption, reversal, or TTR — not the generic questions used earlier in the day.
+- **TTR / small-range-day flag, per Rule 4:** when NIFTY's ATR compresses to a 60–70 point range (down from a recent baseline over 100), this is a specific, concrete trigger — surface it immediately as a "be careful and mindful" reminder, not just a passive stat.
+- Post-market review should ask about process (not just outcome), and give an honest, critical, corrective reflection with a concrete plan for the next session. Feedback here should be precise about mistakes and improvements — not vague encouragement.
+
+### 13.2 Real-Time In-Trade Tagging & Corrective Nudges
+- While in a trade, typing a shorthand tag (Rajesh's own vocabulary — e.g. "SM", "FOL") should log it with a timestamp automatically.
+- Certain tags should trigger a real-time reminder of the relevant emotional pitfall and what's actually at stake in that moment (e.g. a "FOL" tag reminding of the danger of an emotional exit).
+- Tags should be usable both **during** a trade and **before** one (e.g. hesitation before entering), and each tag should show its own corrective measure the moment it's applied — designed per-tag, not generic.
+- Tags feed a **dynamic bell curve / psychology score** over time and should help map behavior patterns across sessions, not just log isolated events.
+- Needs a defined tag taxonomy (see Section 13.16 — several of these tags are Rajesh's own shorthand and need his definitions before real logic can be built around them).
+
+### 13.3 Capital, Risk-of-Ruin & Drawdown Simulation
+- During the capital build-up phase (3% risk), simulate risk of ruin across consecutive losing streaks.
+- Same simulation applies to **any** risk model and to actual live trades — how long the account survives at 30%, 50%, 70%, and full-blowup drawdown thresholds.
+- This should run live against actual trades during an active drawdown phase, warning in real time and suggesting corrective measures (e.g. scale down) — not just as a static, one-time calculator (which is what the current `view-risk` Position Size Calculator does today).
+- Whatever risk-per-trade style Rajesh selects in the Risk Engine should be simulated the same way — consecutive-loss and drawdown/blow-up behavior for that specific style, not a generic one-size model.
+
+### 13.4 Multi-Leg Scale-Out Automation
+- On a multi-lot entry: 1st exit at 2R, 2nd at 3R, 3rd at 4R, last lot on price action (Rajesh's own discretionary read of the tape).
+- This should show live in both the Trade Plan and the Journal, not just get filled in after the fact.
+- Once the first lot exits at 2R, the remaining lots' stop should move to breakeven and then trail to lock in profit.
+- Longer-term: integrate with the broker terminal to make this scaling automatic rather than manually tracked. Explicitly **not** a near-term priority — noted for later once broker integration exists.
+
+### 13.5 Position Sizing Suggestions
+- Based on the current ledger (equity, recent drawdown, streak state), the app should proactively suggest the best position size for the next trade — not just calculate one on request.
+
+### 13.6 Setup / Probability Discipline Loop
+- Core idea: **one good trade** is the target on most days. Per `TAGS_GLOSSARY.md` Rule 3: look for more trades only on a confirmed trend day, only after the emotional score has improved, and even then only A+ setups — and only after a profitable day. Outside a strong trend day, each additional trade in a TR day carries a probability-drop reminder unless it's a genuine A+ setup.
+- Exception: on a confirmed **strong (hard) trend day**, the app should force the opposite behavior — encourage more trades, bigger size, less hesitation. This is explicitly the *only* day to get aggressive.
+- **A+ is now defined**, not a placeholder — see `TAGS_GLOSSARY.md`'s Setup tables (BO, 1st Deeppb, the TR-only 2LR/TCL setups, etc. are the actual A+ list). The existing A+ Setup Reference panel in `view-decision` should be built against these exact setups, not a generic "define your own" field.
+- **Trading window rule, per Rule 6:** trading beyond 2:30 PM is only allowed on a confirmed trend day.
+- **In a TR specifically, per Rule 1:** the only high-probability trade is a reversal from the obvious 2nd-leg move — from the high/low, close to it, or a failed breakout (FBO) of the high/low. Everything else in a TR is lower-probability by definition.
+- Real-time reminder against jumping straight back into a trade right after a break — this leak point was described in the original notes but still has no confirmed tag name in `TAGS_GLOSSARY.md` (an earlier draft of this file incorrectly guessed "LPT" — LPT is actually "Low-Probability Trade," unrelated). This is the one remaining unnamed concept; everything else in the glossary is now fully resolved.
+
+### 13.7 Streak & Session Pattern Detection
+- A 2–5 day winning streak should raise an "overconfidence" flag/reminder about losing focus.
+- A losing streak should raise a parallel flag for accumulated negative emotion and eroding confidence.
+- The app should suggest relevant tags for different emotional states rather than leaving tagging fully manual.
+
+### 13.8 Event & Expiry Awareness
+- Extra caution flagged on expiry days — Tuesday for NIFTY, Thursday for SENSEX — and especially on monthly expiry.
+- Extra caution whenever India VIX crosses above 20.
+- Major macro events (RBI policy, Union Budget, etc.) get their own "event" tag; expiry days get their own "expiry" tag — both used to drive the extra-caution behavior above. (`view-news`'s Market Pulse strip already shows some of this — extend rather than replace.)
+
+### 13.9 Time & Attention / Distraction Tracking
+- Real-time tracking of time spent on Twitter, Telegram, or other identified "wanderer" apps during market hours, with a daily distraction score feeding into the same end-of-day bell curve as the psychology data.
+
+### 13.10 Idea & Feedback Inbox
+- A separate space to drop raw ideas as they occur, to be discussed/debated later, then explicitly kept or discarded — not mixed into the main workflow.
+- Ties directly into Section 0 Rule 11: any proposed feature (from Rajesh or from an AI session) gets weighed against the long-term goal before being built, using this inbox as the holding area for anything not yet decided.
+
+### 13.11 Chart/Screenshot Automation (Amibroker Integration)
+- Investigate integrating with Amibroker so that when a trade is taken (detected via the terminal), a screenshot is captured automatically from Amibroker and attached to the Journal.
+- Ideally both the futures chart and the relevant options chart get captured and tagged together; if only one is feasible, futures chart alone is an acceptable fallback.
+- If a live API-level integration with Amibroker isn't realistic, a simpler fallback: a real-time snip/screenshot workflow that still lands directly in the Journal without extra manual steps.
+- This is a nice-to-have, not core — flagged for evaluation once the Journal and broker integration are both solid (Section 0 Rule 11 applies directly here: real complexity, uncertain payoff, needs a deliberate yes/no when it comes up).
+
+### 13.12 Auto Charges & Taxes Population
+- For real-time/live trades, fetch correct brokerage and statutory charges (STT, exchange charges, GST, stamp duty, etc.) for the relevant segment and auto-populate them into the Journal.
+- When a contract note is uploaded (Tier 2 broker integration), use the CN's actual figures instead of estimates.
+- Auto-population applies to real/live trades and CN uploads — not to fully manual/backdated journal entries, where Rajesh is entering historical or hypothetical data himself.
+
+### 13.13 Broker Integration Roadmap — Refinement
+- Local integration to read the trade/order book directly (no cloud dependency) — this is the core piece Tier 1 already targets.
+- Multi-broker support, plus 2FA handling per broker, is a later addition once Flattrade integration is solid.
+- See Section 4's new "Open tension" note — Rajesh's phrase "auto broker integration at the last stage" needs a direct conversation before Phase 4/5 to clarify scope, since it could mean very different things for the build order.
+
+### 13.14 Personal Growth Layer — Writing & English Coaching
+- Rajesh is a non-native English speaker and wants subtle help improving his writing and phrasing over time — **not formal teaching, and not corrections that interrupt his flow.** He wants to learn through natural exposure, not be taught directly.
+- This applies in two places: (1) as a general interaction style for any AI session working with him (already reflected in his stored preferences), and (2) potentially as a light in-app feature — e.g. the app gently suggesting a clearer word or phrasing when he writes journal notes, theses, or reviews, without ever feeling like a grammar-correction tool.
+- Keep this understated in both contexts — the goal is confidence and natural improvement, never friction.
+
+### 13.15 Testing-Phase Data Reset Utility
+- While the app is still in active testing (current phase), saying "implement" a change should be able to refresh/reset all data cleanly.
+- **Needs a real, safe implementation** before this becomes casual — a guarded "Reset all data (testing only)" action in Settings & Rulebook, behind an explicit confirmation, clearly separated from anything that could be mistaken for resetting real trading history once the app is in daily use. Do not wire a silent/automatic reset trigger — that's a serious foot-gun once real trades are being logged.
+
+### 13.16 Glossary — Fully Resolved (see `TAGS_GLOSSARY.md`)
+Rajesh filed a full glossary (`TAG.txt` → `TAGS_GLOSSARY.md` in the project root), and confirmed the last two open terms directly. **`TAGS_GLOSSARY.md` is now the canonical source** for every setup name, grade, context term, and the six numbered behavioral/session rules — the tag system (13.2) and the discipline loop (13.6) both build against it directly.
+
+- **SM** = Social Media — used as a tag/flag (e.g. time spent on it, or a distraction source — ties into 13.9's distraction tracking).
+- **PA exit** = exit based on market structure — an obvious support/resistance zone, or an opposite-side signal — not a fixed price target. Confirmed, not an inference anymore.
+
+No unresolved terms remain. Any new shorthand introduced later should be added to `TAGS_GLOSSARY.md` directly, not guessed at here.
+
+---
