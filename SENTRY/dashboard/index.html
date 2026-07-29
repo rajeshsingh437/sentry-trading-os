@@ -667,6 +667,37 @@ z-index:10000;
 animation:fadeout 2.2s forwards;
 }
 @keyframes fadeout{0%,80%{opacity:1; transform:translateY(0);} 100%{opacity:0; transform:translateY(4px);}}
+
+/* Live Tag quick-tap widget — Section 13.2, real-time behavioral tagging */
+.tag-fab{
+  position:fixed; bottom:24px; left:24px; z-index:9998;
+  width:52px; height:52px; border-radius:50%;
+  background:var(--blue); color:#fff; border:none;
+  font-size:22px; font-weight:700; cursor:pointer;
+  box-shadow:0 4px 18px rgba(76,141,255,0.45);
+  display:flex; align-items:center; justify-content:center;
+}
+.tag-fab:hover{ filter:brightness(1.08); }
+.tag-popover{
+  position:fixed; bottom:88px; left:24px; z-index:9998;
+  width:280px; background:var(--panel); border:1px solid var(--border);
+  border-radius:12px; padding:12px; box-shadow:var(--shadow-lift);
+  display:none;
+}
+.tag-popover.open{ display:block; }
+.tag-popover h4{ margin:0 0 8px; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-dim); }
+.tag-btn-grid{ display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.tag-btn-grid button{
+  background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+  border-radius:8px; padding:8px 6px; font-size:11.5px; font-weight:600; cursor:pointer; text-align:left;
+}
+.tag-btn-grid button:hover{ border-color:var(--blue); }
+.tag-nudge{
+  position:fixed; bottom:24px; left:88px; max-width:420px; z-index:10001;
+  background:var(--glass); backdrop-filter:blur(14px); border:1px solid var(--glass-border);
+  border-radius:12px; padding:14px 16px; box-shadow:inset 0 1px 0 var(--glass-highlight), var(--shadow-lift);
+}
+.tag-nudge .tag-nudge-close{ float:right; cursor:pointer; color:var(--text-faint); font-size:16px; line-height:1; margin-left:10px; }
 </style>
 </head>
 <body>
@@ -1194,6 +1225,16 @@ animation:fadeout 2.2s forwards;
 </table>
 </div>
 </div>
+<div class="panel">
+<div class="panel-head"><h2>Live Tag Log</h2><span class="tag" id="liveTagCountTag">—</span></div>
+<p style="font-size:12px; color:var(--text-dim); margin-bottom:12px;">Tags logged from the quick-tag button (bottom-left, any screen). Tap "+ Add / manage tags" there to add your own or change ABC mapping. Tags mapped to a Mental/Tactical A/B/C-Game bucket automatically count toward today's Psychology score and bell curve.</p>
+<div style="overflow-x:auto;">
+<table>
+<thead><tr><th>Time</th><th>Tag</th><th>ABC</th><th>Note</th><th></th></tr></thead>
+<tbody id="liveTagLogBody"></tbody>
+</table>
+</div>
+</div>
 </section>
 <!-- ============ ANALYTICS ============ -->
 <section class="view" id="view-analytics">
@@ -1586,6 +1627,11 @@ animation:fadeout 2.2s forwards;
 </section>
 </main>
 </div>
+<button class="tag-fab" id="tagFabBtn" title="Log a live tag (FOL, SM, TTR...)" type="button">+</button>
+<div class="tag-popover" id="tagPopover">
+<h4>Log a Tag</h4>
+<div class="tag-btn-grid" id="tagBtnGrid"></div>
+</div>
 <script>
 (function(){
   // ---------------- State ----------------
@@ -1928,6 +1974,7 @@ animation:fadeout 2.2s forwards;
     preOpen: {date:null, answers:{}},
     hourlyChecks: [],
     costLog: [],
+    liveTags: [],
     abcHistory: [],
     liveNews: [],
     liveNewsUpdated: null,
@@ -3410,6 +3457,209 @@ animation:fadeout 2.2s forwards;
     renderAnalytics();
     $('#costNature').value = ''; $('#costAmount').value = '';
     toast('✔ Cost logged');
+  });
+
+  // ---------------- Live Tags (Section 13.2) + ABC Game auto-mapping ----------------
+  // Definitions and nudge text sourced from TAGS_GLOSSARY.md — edit there first if wording
+  // needs to change, then mirror it here (or just edit tags in-app via "+ Add / manage tags").
+  //
+  // ABC mapping: when a tag carries abcDim + abcBucket, logging it pushes a synthetic key
+  // into state.abcChecked (same array the manual A/B/C Game Self-Check grid uses). This is
+  // deliberate reuse, not a parallel system — computeAbcVerdict(), computePsychologyScore(),
+  // renderAlerts(), and the bell curve (state.abcHistory, archived at day rollover) all
+  // already read from state.abcChecked, so a tag-triggered mark flows through every one of
+  // those automatically. Context tags (TTR, NTD, PA Exit) intentionally have no ABC mapping —
+  // they describe market/method, not Rajesh's behavior, so they shouldn't move a game score.
+  const LIVE_TAG_KEY = 'tos_live_tags_v1';
+  const TAG_DEFS_KEY = 'tos_tag_defs_v1';
+  const DEFAULT_TAG_DEFS = [
+    {code:'FOL', label:'FOL — Fear of Loss', nudge:'Check: are you exiting because price actually hit your stop, or because you\'re scared? Only exit on your plan\'s real trigger.', abcDim:'tactical', abcBucket:'C'},
+    {code:'SM', label:'SM — Social Media', nudge:'You\'re flagging social media right now. Step away from the screen — this is exactly the distraction that erodes your edge during market hours.', abcDim:'mental', abcBucket:'C'},
+    {code:'TTR', label:'TTR — Tight Range', nudge:'Tight range day. Be careful and mindful — only the obvious 2nd-leg reversal at the range extreme is high-probability here.', abcDim:'', abcBucket:''},
+    {code:'NTD', label:'NTD — No Trade Day', nudge:'You\'ve called this a No-Trade Day. Sitting on hands is the trade today — protect your capital and your head.', abcDim:'', abcBucket:''},
+    {code:'SOH', label:'SOH — Sitting on Hands', nudge:'Logged. Staying out when there\'s no A+ setup is itself a winning decision.', abcDim:'tactical', abcBucket:'A'},
+    {code:'LPT', label:'LPT — Low-Prob. Trade', nudge:'Flagging a low-probability trade. Ask honestly: is this genuinely A+, or am I bored/impatient?', abcDim:'tactical', abcBucket:'C'},
+    {code:'PAEXIT', label:'PA Exit', nudge:'Exiting on market structure — confirm it\'s a real support/resistance zone or an opposite-side signal, not just a hunch.', abcDim:'', abcBucket:''},
+  ];
+  let LIVE_TAG_DEFS = DEFAULT_TAG_DEFS.map(d=>({...d}));
+  let tagPopoverMode = 'log'; // 'log' | 'manage'
+  function saveTagDefs(){
+    try{ localStorage.setItem(TAG_DEFS_KEY, JSON.stringify(LIVE_TAG_DEFS)); }catch(e){ /* non-fatal */ }
+  }
+  function loadTagDefs(){
+    try{
+      const raw = localStorage.getItem(TAG_DEFS_KEY);
+      if(raw){
+        const parsed = JSON.parse(raw);
+        if(Array.isArray(parsed) && parsed.length){ LIVE_TAG_DEFS = parsed; return; }
+      }
+      saveTagDefs(); // first run on this machine — persist the seeded defaults
+    }catch(e){ /* ignore corrupt storage, keep in-memory defaults */ }
+  }
+  function saveLiveTags(){
+    try{ localStorage.setItem(LIVE_TAG_KEY, JSON.stringify(state.liveTags.slice(-1000))); }catch(e){ /* non-fatal */ }
+  }
+  function loadLiveTags(){
+    try{
+      const raw = localStorage.getItem(LIVE_TAG_KEY);
+      if(raw){ const parsed = JSON.parse(raw); if(Array.isArray(parsed)) state.liveTags = parsed; }
+    }catch(e){ /* ignore corrupt storage */ }
+  }
+  function abcLabelFor(def){
+    if(!def.abcDim || !def.abcBucket) return null;
+    return `${def.abcDim==='mental'?'Mental':'Tactical'} ${def.abcBucket}-Game`;
+  }
+  function showTagNudge(def, abcLabel){
+    $all('.tag-nudge').forEach(n=>n.remove()); // only one nudge visible at a time
+    const box = document.createElement('div');
+    box.className = 'tag-nudge';
+    const abcLine = abcLabel ? `<p style="margin:8px 0 0; font-size:11px; color:var(--text-faint);">→ counted toward today's <b>${abcLabel}</b> read (Psychology + bell curve).</p>` : '';
+    box.innerHTML = `<span class="tag-nudge-close" title="Dismiss">✕</span><strong style="color:var(--text); font-size:13px;">${def.label}</strong><p style="margin:6px 0 0; font-size:12.5px; color:var(--text-dim); line-height:1.5;">${def.nudge||''}</p>${abcLine}`;
+    document.body.appendChild(box);
+    const remove = ()=>{ if(box.parentNode) box.remove(); };
+    box.querySelector('.tag-nudge-close').addEventListener('click', remove);
+    setTimeout(remove, 7000);
+  }
+  function logLiveTag(code){
+    const def = LIVE_TAG_DEFS.find(d=>d.code===code);
+    if(!def) return;
+    const note = (prompt(`Optional note for ${def.label} (leave blank to skip):`, '') || '').trim();
+    const abcLabel = abcLabelFor(def);
+    state.liveTags.push({
+      id: Date.now(),
+      code: def.code,
+      label: def.label,
+      date: todayISO(),
+      time: new Date().toTimeString().slice(0,5),
+      note,
+      abcLabel,
+    });
+    saveLiveTags();
+    if(def.abcDim && def.abcBucket){
+      // Synthetic key — same format the manual A/B/C checkboxes use (dim:bucket:id), so it's
+      // counted by computeAbcVerdictFor exactly like a manually-checked item. It won't tick
+      // any specific checkbox in the self-check grid (there's no matching fixed item text),
+      // which is fine — the Live Tag Log entry itself is the record of why it counted.
+      state.abcChecked.push(`${def.abcDim}:${def.abcBucket}:tag-${def.code}-${Date.now()}`);
+      saveAbcCheck();
+      renderPsychology(); // cascades: verdict -> psychology score -> bell curve -> alerts
+      renderAlerts();
+    }
+    renderLiveTagLog();
+    showTagNudge(def, abcLabel);
+    $('#tagPopover').classList.remove('open');
+  }
+  function renderTagPopover(){
+    const pop = $('#tagPopover');
+    if(!pop) return;
+    if(tagPopoverMode==='log'){
+      pop.innerHTML = `
+        <h4>Log a Tag</h4>
+        <div class="tag-btn-grid" id="tagBtnGrid">${LIVE_TAG_DEFS.map(d=>`<button data-tag-code="${d.code}" type="button">${d.label}</button>`).join('')}</div>
+        <div style="margin-top:10px; text-align:right;"><a href="#" id="tagManageLink" style="font-size:11px; color:var(--blue); text-decoration:none;">+ Add / manage tags</a></div>
+      `;
+      $all('#tagBtnGrid [data-tag-code]').forEach(btn=>{
+        btn.addEventListener('click', ()=>logLiveTag(btn.dataset.tagCode));
+      });
+      $('#tagManageLink').addEventListener('click', (e)=>{ e.preventDefault(); tagPopoverMode='manage'; renderTagPopover(); });
+    } else {
+      pop.innerHTML = `
+        <h4>Manage Tags</h4>
+        <div id="tagManageList" style="max-height:170px; overflow-y:auto; margin-bottom:10px;">
+          ${LIVE_TAG_DEFS.map(d=>`
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; padding:5px 0; border-bottom:1px solid var(--border-soft); font-size:11px;">
+              <span>${d.label}${d.abcDim ? ` <span style="color:var(--text-faint);">(${d.abcDim==='mental'?'Mental':'Tactical'} ${d.abcBucket})</span>` : ''}</span>
+              <button data-del-tagdef="${d.code}" style="background:none; border:none; color:var(--red); cursor:pointer; font-size:13px; flex-shrink:0;" type="button">✕</button>
+            </div>
+          `).join('')}
+        </div>
+        <h4 style="margin-top:4px;">New Tag</h4>
+        <input id="newTagCode" placeholder="Code (e.g. XYZ)" style="width:100%; margin-bottom:6px; box-sizing:border-box; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px 8px; font-size:12px;" type="text"/>
+        <input id="newTagLabel" placeholder="Label (e.g. XYZ — meaning)" style="width:100%; margin-bottom:6px; box-sizing:border-box; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px 8px; font-size:12px;" type="text"/>
+        <textarea id="newTagNudge" placeholder="Corrective nudge message" style="width:100%; margin-bottom:6px; box-sizing:border-box; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px 8px; font-size:12px; resize:vertical; min-height:44px;"></textarea>
+        <div style="display:flex; gap:6px; margin-bottom:8px;">
+          <select id="newTagAbcDim" style="flex:1; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px; font-size:11px;">
+            <option value="">No ABC mapping</option>
+            <option value="mental">Mental</option>
+            <option value="tactical">Tactical</option>
+          </select>
+          <select id="newTagAbcBucket" style="flex:1; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px; font-size:11px;">
+            <option value="">—</option>
+            <option value="A">A-Game</option>
+            <option value="B">B-Game</option>
+            <option value="C">C-Game</option>
+          </select>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <a href="#" id="tagBackLink" style="font-size:11px; color:var(--text-faint); text-decoration:none;">← Back</a>
+          <button class="btn small primary" id="newTagSaveBtn" type="button">Add tag</button>
+        </div>
+      `;
+      $('#tagBackLink').addEventListener('click', (e)=>{ e.preventDefault(); tagPopoverMode='log'; renderTagPopover(); });
+      $all('[data-del-tagdef]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          if(!confirm('Delete this tag definition? Already-logged entries keep their history — only new taps stop showing it.')) return;
+          LIVE_TAG_DEFS = LIVE_TAG_DEFS.filter(d=>d.code!==btn.dataset.delTagdef);
+          saveTagDefs();
+          renderTagPopover();
+        });
+      });
+      $('#newTagSaveBtn').addEventListener('click', ()=>{
+        const code = $('#newTagCode').value.trim().toUpperCase();
+        const label = $('#newTagLabel').value.trim();
+        const nudge = $('#newTagNudge').value.trim();
+        const abcDim = $('#newTagAbcDim').value;
+        const abcBucket = $('#newTagAbcBucket').value;
+        if(!code || !label){ toast('⚠ Code and label are required'); return; }
+        if(LIVE_TAG_DEFS.some(d=>d.code===code)){ toast('⚠ That tag code already exists'); return; }
+        LIVE_TAG_DEFS.push({code, label, nudge: nudge || `${label} logged.`, abcDim, abcBucket});
+        saveTagDefs();
+        tagPopoverMode = 'log';
+        renderTagPopover();
+        toast(`✔ Tag "${code}" added`);
+      });
+    }
+  }
+  function renderLiveTagLog(){
+    const el = $('#liveTagLogBody');
+    if(!el) return;
+    const today = state.liveTags.filter(t=>t.date===todayISO()).slice().reverse();
+    $('#liveTagCountTag').textContent = `${today.length} tag(s) today`;
+    el.innerHTML = today.length ? today.map(t=>{
+      const abcCell = t.abcLabel
+        ? `<span class="badge ${t.abcLabel.includes('C-Game')?'stop':t.abcLabel.includes('A-Game')?'ok':'warn'}" style="font-size:10px;">${t.abcLabel}</span>`
+        : '—';
+      return `
+      <tr>
+        <td>${t.time}</td>
+        <td>${t.label}</td>
+        <td>${abcCell}</td>
+        <td>${t.note || '—'}</td>
+        <td><button class="btn small danger" data-del-tag="${t.id}" type="button">✕</button></td>
+      </tr>
+    `;
+    }).join('') : `<tr><td colspan="5" style="text-align:center; color:var(--text-faint); padding:16px;">No tags logged yet today.</td></tr>`;
+    $all('[data-del-tag]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        if(!confirm('Delete this tag entry?')) return;
+        state.liveTags = state.liveTags.filter(t=>t.id!==Number(btn.dataset.delTag));
+        saveLiveTags();
+        renderLiveTagLog();
+      });
+    });
+  }
+  $('#tagFabBtn').addEventListener('click', ()=>{
+    const pop = $('#tagPopover');
+    const opening = !pop.classList.contains('open');
+    if(opening){ tagPopoverMode = 'log'; renderTagPopover(); }
+    pop.classList.toggle('open');
+  });
+  document.addEventListener('click', (e)=>{
+    const pop = $('#tagPopover');
+    const fab = $('#tagFabBtn');
+    if(pop && pop.classList.contains('open') && !pop.contains(e.target) && e.target!==fab){
+      pop.classList.remove('open');
+    }
   });
 
   function renderPreTrade(){
@@ -5667,6 +5917,8 @@ animation:fadeout 2.2s forwards;
   loadPreOpen();
   loadHourlyChecks();
   loadCostLog();
+  loadLiveTags();
+  loadTagDefs();
   loadLiveNews();
   loadIfThen();
   loadDisciplineLog();
@@ -5685,6 +5937,8 @@ animation:fadeout 2.2s forwards;
   $('#costDate').value = todayISO();
   renderCostSetupDropdown();
   renderCostLog();
+  renderTagPopover();
+  renderLiveTagLog();
   renderAll();
   renderLiveNews();
   generateReport('weekly');
